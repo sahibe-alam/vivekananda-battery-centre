@@ -46,3 +46,6 @@ pids/
 
 # Electron
 .electron/
+
+# Workflow run logs
+runlogs.zip
