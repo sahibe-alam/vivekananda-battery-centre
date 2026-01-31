@@ -57,10 +57,6 @@ jobs:
 
       - name: Create Windows installer (NSIS) (capture)
         run: npx electron-builder --win --x64 2>&1 | tee eb.log
-        env:
-          # Optional: set these secrets if you want to sign the exe
-          # CSC_LINK: ${{ secrets.CSC_LINK }}
-          # CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
 
       - name: Upload electron-builder log
         uses: actions/upload-artifact@v3
