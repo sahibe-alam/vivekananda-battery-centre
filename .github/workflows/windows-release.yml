@@ -27,6 +27,11 @@ jobs:
       - name: Check Node & npm
         run: node -v && npm -v
 
+      - name: Check electron & electron-builder versions
+        run: |
+          npx electron --version || true
+          npx electron-builder --version || true
+
       - name: Install dependencies
         run: npm install
 
