@@ -57,6 +57,8 @@ jobs:
 
       - name: Create Windows installer (NSIS) (capture)
         run: npx electron-builder --win --x64 2>&1 | tee eb.log
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload electron-builder log
         uses: actions/upload-artifact@v4
