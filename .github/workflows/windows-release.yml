@@ -32,23 +32,41 @@ jobs:
           npx electron --version || true
           npx electron-builder --version || true
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install dependencies (capture)
+        run: npm install 2>&1 | tee npm-install.log
+
+      - name: Upload npm install log
+        uses: actions/upload-artifact@v3
+        with:
+          name: npm-install-log
+          path: npm-install.log
 
       - name: Rebuild native dependencies
         run: |
           npx electron-builder install-app-deps || true
           npx @electron/rebuild -f -w better-sqlite3 || true
 
-      - name: Build renderer & main
-        run: npm run build
+      - name: Build renderer & main (capture)
+        run: npm run build 2>&1 | tee build.log
 
-      - name: Create Windows installer (NSIS)
-        run: npx electron-builder --win --x64
+      - name: Upload build log
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-log
+          path: build.log
+
+      - name: Create Windows installer (NSIS) (capture)
+        run: npx electron-builder --win --x64 2>&1 | tee eb.log
         env:
           # Optional: set these secrets if you want to sign the exe
           # CSC_LINK: ${{ secrets.CSC_LINK }}
           # CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+
+      - name: Upload electron-builder log
+        uses: actions/upload-artifact@v3
+        with:
+          name: electron-builder-log
+          path: eb.log
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v3
