@@ -1,0 +1,77 @@
+{
+  "name": "vivekananda-battery-centre",
+  "version": "1.0.0",
+  "description": "Battery Billing & Inventory Management Desktop Application",
+  "main": "dist/main/main/main.js",
+  "author": "Vivekananda Battery Centre",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:renderer\" \"npm run dev:main\"",
+    "dev:renderer": "vite",
+    "dev:main": "npm run build:preload && tsc -p tsconfig.main.json && NODE_ENV=development electron --inspect=5858 .",
+    "build": "npm run build:renderer && npm run build:preload && npm run build:main",
+    "build:renderer": "vite build",
+    "build:preload": "tsc -p tsconfig.preload.json",
+    "build:main": "tsc -p tsconfig.main.json",
+    "build:win": "npm run build && electron-builder --win --x64",
+    "start": "electron .",
+    "package": "npm run build:win",
+    "package:dir": "npm run build && electron-builder --win --x64 --dir",
+    "typecheck": "tsc --noEmit",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.5.0",
+    "jspdf": "^4.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.21.1"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.2",
+    "@types/better-sqlite3": "^7.6.8",
+    "@types/react": "^18.2.47",
+    "@types/react-dom": "^18.2.18",
+    "@typescript-eslint/eslint-plugin": "^6.18.1",
+    "@typescript-eslint/parser": "^6.18.1",
+    "@vitejs/plugin-react": "^4.2.1",
+    "concurrently": "^8.2.2",
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1",
+    "eslint": "^8.56.0",
+    "eslint-plugin-react": "^7.33.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.11",
+    "vite-plugin-electron": "^0.28.2"
+  },
+  "build": {
+    "appId": "com.vivekananda.battery",
+    "productName": "Vivekananda Battery Centre",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}

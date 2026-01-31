@@ -1,0 +1,100 @@
+.bill-layout {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 2rem;
+}
+
+.section-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--primary-color);
+}
+
+.stock-info {
+  padding: 1rem;
+  background: var(--bg-gray);
+  border-radius: 0.5rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stock-badge {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--success-color);
+}
+
+.serial-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.item-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.item-card {
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.item-card:hover {
+  border-color: var(--primary-color);
+  background: var(--bg-gray);
+  transform: translateX(4px);
+}
+
+.item-info {
+  flex: 1;
+}
+
+.item-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.item-tax {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.item-stock {
+  font-weight: 600;
+}
+
+.item-stock .in-stock {
+  color: var(--success-color);
+}
+
+.item-stock .out-of-stock {
+  color: var(--danger-color);
+}
+
+@media (max-width: 1024px) {
+  .bill-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .serial-grid {
+    grid-template-columns: 1fr;
+  }
+}

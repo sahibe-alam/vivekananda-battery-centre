@@ -1,0 +1,135 @@
+import { app, BrowserWindow, ipcMain } from 'electron';
+import path from 'path';
+import { DatabaseService } from './database';
+import { setupIpcHandlers } from './ipc-handlers';
+import { IPC_CHANNELS, PrintInvoiceRequest } from '../shared/types';
+
+let mainWindow: BrowserWindow | null = null;
+let database: DatabaseService | null = null;
+
+function createWindow(): void {
+  // Determine preload path based on environment
+  const preloadPath = process.env.NODE_ENV === 'development'
+    ? path.join(app.getAppPath(), 'dist/preload/preload/preload.js')
+    : path.join(__dirname, '../../../preload/preload/preload.js');
+
+  console.log('Preload path:', preloadPath);
+  console.log('App path:', app.getAppPath());
+  console.log('__dirname:', __dirname);
+
+  mainWindow = new BrowserWindow({
+    width: 1400,
+    height: 900,
+    minWidth: 1200,
+    minHeight: 700,
+    webPreferences: {
+      preload: preloadPath,
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: false,
+    },
+    show: false,
+  });
+
+  // Load the app
+  if (process.env.NODE_ENV === 'development') {
+    // Wait a bit for Vite server to start, then load
+    setTimeout(() => {
+      mainWindow?.loadURL('http://localhost:5173').catch(() => {
+        // If 5173 fails, try 5174
+        mainWindow?.loadURL('http://localhost:5174');
+      });
+    }, 1000);
+    mainWindow.webContents.openDevTools();
+  } else {
+    mainWindow.loadFile(path.join(__dirname, '../../../renderer/index.html'));
+  }
+
+  mainWindow.once('ready-to-show', () => {
+    mainWindow?.show();
+  });
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+}
+
+// Printing handler
+function setupPrintHandler(): void {
+  ipcMain.handle(
+    IPC_CHANNELS.PRINT_INVOICE,
+    async (_event, request: PrintInvoiceRequest) => {
+      if (!mainWindow) {
+        throw new Error('Main window not available');
+      }
+
+      // Create a hidden window for printing
+      const printWindow = new BrowserWindow({
+        show: false,
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true,
+        },
+      });
+
+      await printWindow.loadURL(
+        `data:text/html;charset=utf-8,${encodeURIComponent(request.html)}`
+      );
+
+      return new Promise<{ success: boolean }>((resolve, reject) => {
+        printWindow.webContents.print(
+          {
+            silent: false,
+            printBackground: true,
+            margins: {
+              marginType: 'custom',
+              top: 0.5,
+              bottom: 0.5,
+              left: 0.5,
+              right: 0.5,
+            },
+          },
+          (success, errorType) => {
+            printWindow.close();
+            if (success) {
+              resolve({ success: true });
+            } else {
+              reject(new Error(`Print failed: ${errorType}`));
+            }
+          }
+        );
+      });
+    }
+  );
+}
+
+app.whenReady().then(() => {
+  // Initialize database
+  database = new DatabaseService();
+  
+  // Setup IPC handlers
+  setupIpcHandlers(database);
+  setupPrintHandler();
+  
+  // Create main window
+  createWindow();
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
+  });
+});
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
+
+app.on('before-quit', () => {
+  // Close database connection
+  if (database) {
+    database.close();
+  }
+});
