@@ -281,6 +281,8 @@ build/
 └── icon.png    (macOS icon, 512x512 or 1024x1024)
 ```
 
+> Note: Place your actual `icon.ico` file at `build/icon.ico` in the repository so it is included in packaged releases. Use an icon converter (e.g. https://www.icoconverter.com/) to produce a proper `.ico` from a high-resolution PNG if needed.
+
 ### Rebuild
 ```bash
 npm run package
