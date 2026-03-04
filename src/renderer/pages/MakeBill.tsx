@@ -269,6 +269,17 @@ const MakeBill: React.FC<Props> = ({ companyId }) => {
   const generatePDF = (bill: any): jsPDF => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
+    const lineHeight = 4;
+    const toWrappedLines = (value: string, width: number, maxLines?: number): string[] => {
+      const lines = doc.splitTextToSize(value || '', width) as string[];
+      if (!maxLines || lines.length <= maxLines) {
+        return lines;
+      }
+      const trimmed = lines.slice(0, maxLines);
+      const lastLine = trimmed[maxLines - 1];
+      trimmed[maxLines - 1] = lastLine.length > 2 ? `${lastLine.slice(0, lastLine.length - 2)}..` : `${lastLine}..`;
+      return trimmed;
+    };
     let yPos = 15;
 
     // Header - Dynamic from Profile
@@ -334,49 +345,59 @@ const MakeBill: React.FC<Props> = ({ companyId }) => {
     doc.text('Buyer (if other than consignee)', col1X + 2, yPos + 5);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
-    const clientLines = bill.clientDetails.split('\n');
+    const clientLines = (bill.clientDetails || '')
+      .split('\n')
+      .flatMap((line: string) => toWrappedLines(line, 96));
     let clientY = yPos + 10;
     clientLines.forEach((line: string) => {
       if (clientY < yPos + 23) {
-        doc.text(line.substring(0, 80), col1X + 2, clientY);
-        clientY += 4;
+        doc.text(line, col1X + 2, clientY);
+        clientY += lineHeight;
       }
     });
     yPos += 27;
 
-    const colWidths = [10, 15, 80, 20, 15, 12, 12, 16];
-    doc.rect(col1X, yPos, 180, 8);
+    const colWidths = [10, 15, 74, 20, 15, 12, 12, 22];
+    const descriptionTextWidth = Math.max(32, colWidths[2] - 28);
+    const modelLines = toWrappedLines(bill.model || '', descriptionTextWidth, 4);
+    const typeLines = toWrappedLines(`Type:- ${bill.type || ''}`, descriptionTextWidth, 3);
+    const serialLines = toWrappedLines(`SN:- ${(bill.serialNumbers || []).join(', ')}`, descriptionTextWidth, 6);
+    const descriptionLeftLines = [...modelLines, ...typeLines, ...serialLines];
+    const itemHeaderHeight = 8;
+    const minItemBodyHeight = 42;
+    const dynamicItemBodyHeight = Math.max(minItemBodyHeight, 12 + descriptionLeftLines.length * lineHeight);
+    const itemTableHeight = itemHeaderHeight + dynamicItemBodyHeight;
+
+    doc.rect(col1X, yPos, 180, itemHeaderHeight);
     let xPos = col1X;
     doc.setFont('helvetica', 'bold');
     ['Sl No.', 'SF', 'Description of Goods', 'HSN/SAC', 'Quantity', 'Rate', 'Per', 'Amount'].forEach((header, i) => {
       doc.text(header, xPos + 2, yPos + 5);
       xPos += colWidths[i];
-      if (i < 7) doc.line(xPos, yPos, xPos, yPos + 50);
+      if (i < 7) doc.line(xPos, yPos, xPos, yPos + itemTableHeight);
     });
-    yPos += 8;
+    yPos += itemHeaderHeight;
 
-    doc.rect(col1X, yPos, 180, 42);
+    doc.rect(col1X, yPos, 180, dynamicItemBodyHeight);
     doc.setFont('helvetica', 'normal');
     xPos = col1X;
     doc.text('1', xPos + 3, yPos + 5);
     xPos += colWidths[0];
     doc.text('SF', xPos + 1, yPos + 5);
     xPos += colWidths[1];
-    
     let descY = yPos + 5;
-    doc.text(bill.model, xPos + 2, descY);
-    descY += 4;
-    doc.text(`Type:- ${bill.type}`, xPos + 2, descY);
-    descY += 4;
-    doc.text(`SN:- ${bill.serialNumbers.join(', ')}`, xPos + 2, descY);
-    descY += 8;
-    doc.text('OUTPUT CGST', xPos + 50, descY);
-    doc.text(bill.cgstPercent + '%', xPos + 70, descY);
-    descY += 4;
-    doc.text('OUTPUT SGST', xPos + 50, descY);
-    doc.text(bill.sgstPercent + '%', xPos + 70, descY);
-    descY += 4;
-    doc.text('ROUND OFF', xPos + 50, descY);
+    descriptionLeftLines.forEach((line) => {
+      doc.text(line, xPos + 2, descY);
+      descY += lineHeight;
+    });
+    const taxLabelY = Math.max(yPos + 25, descY + 2);
+    const taxLabelX = xPos + Math.max(36, colWidths[2] - 30);
+    const taxPercentX = xPos + colWidths[2] - 10;
+    doc.text('OUTPUT CGST', taxLabelX, taxLabelY);
+    doc.text(bill.cgstPercent + '%', taxPercentX, taxLabelY);
+    doc.text('OUTPUT SGST', taxLabelX, taxLabelY + lineHeight);
+    doc.text(bill.sgstPercent + '%', taxPercentX, taxLabelY + lineHeight);
+    doc.text('ROUND OFF', taxLabelX, taxLabelY + lineHeight * 2);
     
     xPos += colWidths[2];
     doc.text('8507', xPos + 2, yPos + 5);
@@ -392,30 +413,39 @@ const MakeBill: React.FC<Props> = ({ companyId }) => {
     
     const cgstAmount = bill.cgstAmount;
     const sgstAmount = bill.sgstAmount;
+    const roundOffAmount = bill.totalAmount - (baseAmount + cgstAmount + sgstAmount);
+    const amountColX = col1X + colWidths.slice(0, 7).reduce((sum, width) => sum + width, 0);
+    const amountValueRightX = amountColX + colWidths[7] - 1;
+    const drawAmountLine = (y: number, value: number): void => {
+      doc.text(`INR ${value.toFixed(2)}`, amountValueRightX, y, { align: 'right' });
+    };
+    const baseAmountY = yPos + 7;
+    const cgstAmountY = taxLabelY + 2;
+    const sgstAmountY = taxLabelY + lineHeight + 2;
+    const roundOffAmountY = taxLabelY + lineHeight * 2 + 2;
     
-    doc.text('INR', xPos + 2, yPos + 5);
-    doc.text(baseAmount.toFixed(2), xPos + 14, yPos + 9, { align: 'right' });
-    doc.text('INR', xPos + 2, yPos + 25);
-    doc.text(cgstAmount.toFixed(2), xPos + 14, yPos + 29, { align: 'right' });
-    doc.text('INR', xPos + 2, yPos + 33);
-    doc.text(sgstAmount.toFixed(2), xPos + 14, yPos + 37, { align: 'right' });
-    doc.text('INR', xPos + 2, yPos + 41);
-    yPos += 42;
+    drawAmountLine(baseAmountY, baseAmount);
+    drawAmountLine(cgstAmountY, cgstAmount);
+    drawAmountLine(sgstAmountY, sgstAmount);
+    drawAmountLine(roundOffAmountY, roundOffAmount);
+    yPos += dynamicItemBodyHeight;
 
     doc.rect(col1X, yPos, 180, 8);
     doc.setFont('helvetica', 'bold');
     xPos = col1X + colWidths[0] + colWidths[1];
     doc.text('Total', xPos + 2, yPos + 5);
-    xPos = col1X + 180 - colWidths[7];
-    doc.text(bill.totalAmount.toFixed(2), xPos + 14, yPos + 5, { align: 'right' });
+    doc.text(bill.totalAmount.toFixed(2), amountValueRightX, yPos + 5, { align: 'right' });
     yPos += 8;
 
-    doc.rect(col1X, yPos, 180, 8);
+    const amountWords = `Rupees ${numberToWords(Math.round(bill.totalAmount))} Only`;
+    const amountWordsLines = toWrappedLines(amountWords, 125, 2);
+    const amountWordsHeight = Math.max(8, amountWordsLines.length * lineHeight + 2);
+    doc.rect(col1X, yPos, 180, amountWordsHeight);
     doc.setFont('helvetica', 'normal');
     doc.text('Amount Chargeable (in words) :', col1X + 2, yPos + 5);
     doc.setFont('helvetica', 'bold');
-    doc.text('Rupees ' + numberToWords(Math.round(bill.totalAmount)) + ' Only', col1X + 50, yPos + 5);
-    yPos += 8;
+    doc.text(amountWordsLines, col1X + 50, yPos + 5);
+    yPos += amountWordsHeight;
 
     doc.rect(col1X, yPos, 180, 16);
     [60, 90, 120, 150].forEach(offset => doc.line(col1X + offset, yPos, col1X + offset, yPos + 16));
@@ -431,7 +461,7 @@ const MakeBill: React.FC<Props> = ({ companyId }) => {
     doc.text('Rate', col1X + 125, yPos + 11);
     doc.text('Amount', col1X + 140, yPos + 11);
     doc.setFont('helvetica', 'normal');
-    doc.text(baseAmount.toFixed(2), col1X + 25, yPos + 14, { align: 'right' });
+    doc.text(baseAmount.toFixed(2), col1X + 58, yPos + 14, { align: 'right' });
     doc.text(bill.cgstPercent + '%', col1X + 68, yPos + 14, { align: 'right' });
     doc.text(cgstAmount.toFixed(2), col1X + 88, yPos + 14, { align: 'right' });
     doc.text(bill.sgstPercent + '%', col1X + 128, yPos + 14, { align: 'right' });
@@ -441,20 +471,23 @@ const MakeBill: React.FC<Props> = ({ companyId }) => {
 
     doc.rect(col1X, yPos, 180, 8);
     doc.setFont('helvetica', 'bold');
-    doc.text('Total', col1X + 20, yPos + 5);
-    doc.text(baseAmount.toFixed(2), col1X + 25, yPos + 5, { align: 'right' });
+    doc.text('Total', col1X + 2, yPos + 5);
+    doc.text(baseAmount.toFixed(2), col1X + 58, yPos + 5, { align: 'right' });
     doc.text(cgstAmount.toFixed(2), col1X + 88, yPos + 5, { align: 'right' });
     doc.text(sgstAmount.toFixed(2), col1X + 148, yPos + 5, { align: 'right' });
     doc.text((cgstAmount + sgstAmount).toFixed(2), col1X + 168, yPos + 5, { align: 'right' });
     yPos += 8;
 
-    doc.rect(col1X, yPos, 180, 6);
+    const taxWords = `Rupees ${numberToWords(Math.round(cgstAmount + sgstAmount))} Only`;
+    const taxWordsLines = toWrappedLines(taxWords, 148, 2);
+    const taxWordsHeight = Math.max(6, taxWordsLines.length * 3 + 3);
+    doc.rect(col1X, yPos, 180, taxWordsHeight);
     doc.setFontSize(7);
     doc.setFont('helvetica', 'normal');
     doc.text('Tax Amount (in words) :', col1X + 2, yPos + 4);
     doc.setFont('helvetica', 'bold');
-    doc.text('Rupees ' + numberToWords(Math.round(cgstAmount + sgstAmount)) + ' Only', col1X + 35, yPos + 4);
-    yPos += 6;
+    doc.text(taxWordsLines, col1X + 35, yPos + 4);
+    yPos += taxWordsHeight;
 
     doc.rect(col1X, yPos, 120, 20);
     doc.setFontSize(8);
@@ -475,7 +508,8 @@ const MakeBill: React.FC<Props> = ({ companyId }) => {
     doc.rect(col1X + 120, yPos, 60, 20);
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
-    doc.text(`for ${profile?.businessName || 'VIVEKANANDA BATTERY CENTRE'}`, col1X + 125, yPos + 15);
+    const companyNameLines = toWrappedLines(`for ${profile?.businessName || 'VIVEKANANDA BATTERY CENTRE'}`, 50, 2);
+    doc.text(companyNameLines, col1X + 125, yPos + 11);
     yPos += 20;
 
     doc.rect(col1X, yPos, 180, 12);

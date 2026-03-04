@@ -11,7 +11,7 @@ function createWindow(): void {
   // Determine preload path based on environment
   const preloadPath = process.env.NODE_ENV === 'development'
     ? path.join(app.getAppPath(), 'dist/preload/preload/preload.js')
-    : path.join(__dirname, '../../../preload/preload/preload.js');
+    : path.join(__dirname, '../../preload/preload/preload.js');
 
   console.log('Preload path:', preloadPath);
   console.log('App path:', app.getAppPath());
@@ -42,7 +42,27 @@ function createWindow(): void {
     }, 1000);
     mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../../../renderer/index.html'));
+    mainWindow.loadFile(path.join(__dirname, '../../renderer/index.html'));
+  }
+
+  // Debugging hooks to capture renderer lifecycle and errors
+  mainWindow.webContents.on('did-finish-load', () => {
+    console.log('Renderer did-finish-load:', mainWindow?.webContents.getURL());
+  });
+
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    console.error('Renderer failed to load', { errorCode, errorDescription, validatedURL });
+  });
+
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    console.error('Render process gone:', details);
+  });
+
+  mainWindow.on('unresponsive', () => console.error('Main window unresponsive'));
+
+  // Open DevTools in production builds to inspect issues when running file://
+  if (process.env.NODE_ENV !== 'development') {
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
 
   mainWindow.once('ready-to-show', () => {
