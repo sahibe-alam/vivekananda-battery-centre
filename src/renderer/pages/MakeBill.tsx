@@ -25,27 +25,97 @@ interface CustomerDetails {
   gstNumber: string;
 }
 
+interface InvoiceDetails {
+  invoiceTitle: string;
+  invoiceCopyLabel: string;
+  invoiceDate: string;
+  deliveryNote: string;
+  modeTermsOfPayment: string;
+  suppliersRef: string;
+  otherReferences: string;
+  buyersOrderNo: string;
+  buyersOrderDate: string;
+  dispatchDocNo: string;
+  deliveryNoteDate: string;
+  dispatchedThrough: string;
+  destination: string;
+  termsOfDelivery: string;
+  buyerHeading: string;
+  hsnSac: string;
+  sfCode: string;
+  perUnit: string;
+  outputCgstLabel: string;
+  outputSgstLabel: string;
+  roundOffLabel: string;
+  bankName: string;
+  accountNumber: string;
+  branchIfsc: string;
+  declarationLine1: string;
+  declarationLine2: string;
+  jurisdictionText: string;
+  computerGeneratedText: string;
+}
+
+const INITIAL_BILL_ITEM: BillItem = {
+  model: '',
+  type: '',
+  serialNumbers: ['', '', '', ''],
+  quantity: 0,
+  rate: 0,
+  cgstPercent: 9,
+  sgstPercent: 9,
+};
+
+const INITIAL_CUSTOMER_DETAILS: CustomerDetails = {
+  name: '',
+  phone: '',
+  address: '',
+  gstNumber: '',
+};
+
+const createInitialInvoiceDetails = (profile?: Profile | null): InvoiceDetails => ({
+  invoiceTitle: 'GST Tax Invoice',
+  invoiceCopyLabel: '(Duplicate)',
+  invoiceDate: new Date().toISOString().split('T')[0],
+  deliveryNote: '',
+  modeTermsOfPayment: '',
+  suppliersRef: '',
+  otherReferences: '',
+  buyersOrderNo: '',
+  buyersOrderDate: '',
+  dispatchDocNo: '',
+  deliveryNoteDate: '',
+  dispatchedThrough: '',
+  destination: '',
+  termsOfDelivery: '',
+  buyerHeading: 'Buyer (if other than consignee)',
+  hsnSac: '8507',
+  sfCode: 'SF',
+  perUnit: 'PCs',
+  outputCgstLabel: 'OUTPUT CGST',
+  outputSgstLabel: 'OUTPUT SGST',
+  roundOffLabel: 'ROUND OFF',
+  bankName: profile?.bankDetail?.bankName?.trim() || 'BANK OF INDIA',
+  accountNumber: profile?.bankDetail?.accountNumber?.trim() || '428120110000218',
+  branchIfsc: `${profile?.bankDetail?.branch?.trim() || 'BALLY BAZAR'} & ${
+    profile?.bankDetail?.ifscCode?.trim() || 'BKID0004281'
+  }`,
+  declarationLine1: 'We declare that this invoice shows the actual price of the goods',
+  declarationLine2: 'described and that all particulars are true and correct.',
+  jurisdictionText: 'SUBJECT TO HOWRAH JURISDICTION',
+  computerGeneratedText: 'This is a Computer Generated Invoice',
+});
+
 const MakeBill: React.FC<Props> = ({ companyId }) => {
   const navigate = useNavigate();
   const [items, setItems] = useState<ItemMaster[]>([]);
   const [stock, setStock] = useState<Stock[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [showItemModal, setShowItemModal] = useState(false);
-  const [billItem, setBillItem] = useState<BillItem>({
-    model: '',
-    type: '',
-    serialNumbers: ['', '', '', ''],
-    quantity: 1,
-    rate: 0,
-    cgstPercent: 9,
-    sgstPercent: 9,
-  });
-  const [customerDetails, setCustomerDetails] = useState<CustomerDetails>({
-    name: '',
-    phone: '',
-    address: '',
-    gstNumber: '',
-  });
+  const [showBillDetailsModal, setShowBillDetailsModal] = useState(true);
+  const [billItem, setBillItem] = useState<BillItem>(INITIAL_BILL_ITEM);
+  const [customerDetails, setCustomerDetails] = useState<CustomerDetails>(INITIAL_CUSTOMER_DETAILS);
+  const [invoiceDetails, setInvoiceDetails] = useState<InvoiceDetails>(createInitialInvoiceDetails());
   const [roundOff, setRoundOff] = useState(0);
   const [savedBill, setSavedBill] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -65,6 +135,16 @@ const MakeBill: React.FC<Props> = ({ companyId }) => {
       setItems(itemsData);
       setStock(stockData);
       setProfile(profileData);
+      setInvoiceDetails((prev) => {
+        const defaults = createInitialInvoiceDetails(profileData);
+        return {
+          ...defaults,
+          ...prev,
+          bankName: prev.bankName || defaults.bankName,
+          accountNumber: prev.accountNumber || defaults.accountNumber,
+          branchIfsc: prev.branchIfsc || defaults.branchIfsc,
+        };
+      });
       console.log('Data loaded:', { items: itemsData.length, stock: stockData.length, profile: profileData });
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -100,6 +180,13 @@ const MakeBill: React.FC<Props> = ({ companyId }) => {
     setBillItem({ ...billItem, serialNumbers: newSerialNumbers });
   };
 
+  const handleInvoiceDetailChange = <K extends keyof InvoiceDetails>(
+    field: K,
+    value: InvoiceDetails[K]
+  ) => {
+    setInvoiceDetails((prev) => ({ ...prev, [field]: value }));
+  };
+
   const calculateAmounts = () => {
     const subtotal = billItem.rate * billItem.quantity;
     const cgstAmount = (subtotal * billItem.cgstPercent) / 100;
@@ -117,6 +204,16 @@ const MakeBill: React.FC<Props> = ({ companyId }) => {
   };
 
   const amounts = calculateAmounts();
+
+  const resetForm = () => {
+    setBillItem(INITIAL_BILL_ITEM);
+    setCustomerDetails(INITIAL_CUSTOMER_DETAILS);
+    setInvoiceDetails(createInitialInvoiceDetails(profile));
+    setRoundOff(0);
+    setShowItemModal(false);
+    setShowBillDetailsModal(false);
+    setSavedBill(null);
+  };
 
   const handleSaveBill = async () => {
     if (!customerDetails.name.trim()) {
@@ -174,29 +271,12 @@ const MakeBill: React.FC<Props> = ({ companyId }) => {
         clientDetails: clientDetailsText,
         customerDetails,
         profile,
+        invoiceDetails,
       });
 
       alert('Bill saved successfully! Stock updated.');
-      
-      // Reset form
-      setBillItem({
-        model: '',
-        type: '',
-        serialNumbers: ['', '', '', ''],
-        quantity: 1,
-        rate: 0,
-        cgstPercent: 9,
-        sgstPercent: 9,
-      });
-      setCustomerDetails({
-        name: '',
-        phone: '',
-        address: '',
-        gstNumber: '',
-      });
-      setRoundOff(0);
-      setShowItemModal(false);
-      
+      setShowBillDetailsModal(false);
+
       // Reload stock
       await loadData();
     } catch (error) {
@@ -268,6 +348,7 @@ const MakeBill: React.FC<Props> = ({ companyId }) => {
 
   const generatePDF = (bill: any): jsPDF => {
     const doc = new jsPDF();
+    const details: InvoiceDetails = bill.invoiceDetails || invoiceDetails;
     const pageWidth = doc.internal.pageSize.getWidth();
     const lineHeight = 4;
     const toWrappedLines = (value: string, width: number, maxLines?: number): string[] => {
@@ -301,10 +382,10 @@ const MakeBill: React.FC<Props> = ({ companyId }) => {
     yPos += 8;
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
-    doc.text('GST Tax Invoice', pageWidth / 2, yPos, { align: 'center' });
+    doc.text(details.invoiceTitle, pageWidth / 2, yPos, { align: 'center' });
     yPos += 4;
     doc.setFontSize(10);
-    doc.text('(Duplicate)', pageWidth / 2, yPos, { align: 'center' });
+    doc.text(details.invoiceCopyLabel, pageWidth / 2, yPos, { align: 'center' });
     yPos += 8;
 
     const col1X = 15;
@@ -319,15 +400,23 @@ const MakeBill: React.FC<Props> = ({ companyId }) => {
     doc.text('Invoice No.', col1X + 2, yPos + 5);
     doc.text(bill.invoiceNumber, col2X + 2, yPos + 5);
     doc.text('Dated', col3X + 2, yPos + 5);
-    doc.text(new Date(bill.date).toLocaleDateString(), col3X + 15, yPos + 5);
+    doc.text(new Date(details.invoiceDate || bill.date).toLocaleDateString(), col3X + 15, yPos + 5);
     doc.text('Delivery Note', col1X + 2, yPos + 13);
+    doc.text(details.deliveryNote, col2X + 2, yPos + 13);
     doc.text('Mode/Terms of Payment', col3X + 2, yPos + 13);
+    doc.text(details.modeTermsOfPayment, col3X + 42, yPos + 13);
     doc.text("Supplier's Ref.", col1X + 2, yPos + 21);
+    doc.text(details.suppliersRef, col2X + 2, yPos + 21);
     doc.text('Other Reference(s)', col3X + 2, yPos + 21);
+    doc.text(details.otherReferences, col3X + 42, yPos + 21);
     doc.text("Buyer's Order No", col1X + 2, yPos + 29);
+    doc.text(details.buyersOrderNo, col2X + 2, yPos + 29);
     doc.text('Dated', col3X + 2, yPos + 29);
+    doc.text(details.buyersOrderDate, col3X + 15, yPos + 29);
     doc.text('Despatched DocumentNo.', col1X + 2, yPos + 37);
+    doc.text(details.dispatchDocNo, col2X + 2, yPos + 37);
     doc.text('Delivery Note Date', col3X + 2, yPos + 37);
+    doc.text(details.deliveryNoteDate, col3X + 30, yPos + 37);
     yPos += 42;
 
     doc.rect(col1X, yPos, 180, 16);
@@ -335,14 +424,17 @@ const MakeBill: React.FC<Props> = ({ companyId }) => {
     doc.line(col3X, yPos, col3X, yPos + 16);
     doc.line(col1X, yPos + 8, 195, yPos + 8);
     doc.text('Despatched through', col1X + 2, yPos + 5);
+    doc.text(details.dispatchedThrough, col2X + 2, yPos + 5);
     doc.text('Destination', col3X + 2, yPos + 5);
+    doc.text(details.destination, col3X + 22, yPos + 5);
     doc.text('Terms of delivery', col1X + 2, yPos + 13);
+    doc.text(details.termsOfDelivery, col2X + 2, yPos + 13);
     yPos += 18;
 
     doc.rect(col1X, yPos, 180, 25);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
-    doc.text('Buyer (if other than consignee)', col1X + 2, yPos + 5);
+    doc.text(details.buyerHeading, col1X + 2, yPos + 5);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     const clientLines = (bill.clientDetails || '')
@@ -383,7 +475,7 @@ const MakeBill: React.FC<Props> = ({ companyId }) => {
     xPos = col1X;
     doc.text('1', xPos + 3, yPos + 5);
     xPos += colWidths[0];
-    doc.text('SF', xPos + 1, yPos + 5);
+    doc.text(details.sfCode, xPos + 1, yPos + 5);
     xPos += colWidths[1];
     let descY = yPos + 5;
     descriptionLeftLines.forEach((line) => {
@@ -393,14 +485,14 @@ const MakeBill: React.FC<Props> = ({ companyId }) => {
     const taxLabelY = Math.max(yPos + 25, descY + 2);
     const taxLabelX = xPos + Math.max(36, colWidths[2] - 30);
     const taxPercentX = xPos + colWidths[2] - 10;
-    doc.text('OUTPUT CGST', taxLabelX, taxLabelY);
+    doc.text(details.outputCgstLabel, taxLabelX, taxLabelY);
     doc.text(bill.cgstPercent + '%', taxPercentX, taxLabelY);
-    doc.text('OUTPUT SGST', taxLabelX, taxLabelY + lineHeight);
+    doc.text(details.outputSgstLabel, taxLabelX, taxLabelY + lineHeight);
     doc.text(bill.sgstPercent + '%', taxPercentX, taxLabelY + lineHeight);
-    doc.text('ROUND OFF', taxLabelX, taxLabelY + lineHeight * 2);
+    doc.text(details.roundOffLabel, taxLabelX, taxLabelY + lineHeight * 2);
     
     xPos += colWidths[2];
-    doc.text('8507', xPos + 2, yPos + 5);
+    doc.text(details.hsnSac, xPos + 2, yPos + 5);
     xPos += colWidths[3];
     doc.text(bill.quantity.toString(), xPos + 2, yPos + 5);
     xPos += colWidths[4];
@@ -408,7 +500,7 @@ const MakeBill: React.FC<Props> = ({ companyId }) => {
     const baseAmount = bill.quantity * bill.rate;
     doc.text(bill.rate.toFixed(2), xPos + 2, yPos + 5);
     xPos += colWidths[5];
-    doc.text('PCs', xPos + 2, yPos + 5);
+    doc.text(details.perUnit, xPos + 2, yPos + 5);
     xPos += colWidths[6];
     
     const cgstAmount = bill.cgstAmount;
@@ -495,15 +587,15 @@ const MakeBill: React.FC<Props> = ({ companyId }) => {
     doc.text("Company's Bank Details:", col1X + 2, yPos + 4);
     doc.text('Bank Name:', col1X + 2, yPos + 8);
     doc.setFont('helvetica', 'bold');
-    doc.text('BANK OF INDIA', col1X + 25, yPos + 8);
+    doc.text(details.bankName, col1X + 25, yPos + 8);
     doc.setFont('helvetica', 'normal');
     doc.text('A/c No.:', col1X + 2, yPos + 12);
     doc.setFont('helvetica', 'bold');
-    doc.text('428120110000218', col1X + 25, yPos + 12);
+    doc.text(details.accountNumber, col1X + 25, yPos + 12);
     doc.setFont('helvetica', 'normal');
     doc.text('Branch & IFS Code :', col1X + 2, yPos + 16);
     doc.setFont('helvetica', 'bold');
-    doc.text('BALLY BAZAR & BKID0004281', col1X + 25, yPos + 16);
+    doc.text(details.branchIfsc, col1X + 25, yPos + 16);
     
     doc.rect(col1X + 120, yPos, 60, 20);
     doc.setFontSize(8);
@@ -515,13 +607,13 @@ const MakeBill: React.FC<Props> = ({ companyId }) => {
     doc.rect(col1X, yPos, 180, 12);
     doc.setFontSize(7);
     doc.text('Declaration', col1X + 2, yPos + 4);
-    doc.text('We declare that this invoice shows the actual price of the goods', col1X + 2, yPos + 8);
-    doc.text('described and that all particulars are true and correct.', col1X + 2, yPos + 11);
+    doc.text(details.declarationLine1, col1X + 2, yPos + 8);
+    doc.text(details.declarationLine2, col1X + 2, yPos + 11);
     yPos += 14;
 
     doc.setFontSize(7);
-    doc.text('SUBJECT TO HOWRAH JURISDICTION', pageWidth / 2, yPos, { align: 'center' });
-    doc.text('This is a Computer Generated Invoice', pageWidth / 2, yPos + 3, { align: 'center' });
+    doc.text(details.jurisdictionText, pageWidth / 2, yPos, { align: 'center' });
+    doc.text(details.computerGeneratedText, pageWidth / 2, yPos + 3, { align: 'center' });
 
     doc.save(`Invoice_${bill.invoiceNumber}.pdf`);
     return doc;
@@ -532,6 +624,9 @@ const MakeBill: React.FC<Props> = ({ companyId }) => {
       <div className="page-header">
         <h1 className="page-title">Make New Bill</h1>
         <div className="page-actions">
+          <button className="btn btn-primary" onClick={() => setShowBillDetailsModal(true)}>
+            📝 Edit Bill Details
+          </button>
           {savedBill && (
             <>
               <button className="btn btn-primary" onClick={handleDownload}>
@@ -542,7 +637,13 @@ const MakeBill: React.FC<Props> = ({ companyId }) => {
               </button>
             </>
           )}
-          <button className="btn btn-secondary" onClick={() => navigate('/dashboard')}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => {
+              resetForm();
+              navigate('/dashboard');
+            }}
+          >
             ← Back
           </button>
         </div>
@@ -653,9 +754,9 @@ const MakeBill: React.FC<Props> = ({ companyId }) => {
                   <input
                     type="number"
                     className="form-input"
-                    value={billItem.quantity}
+                    value={billItem.quantity || ''}
                     onChange={(e) =>
-                      setBillItem({ ...billItem, quantity: parseInt(e.target.value) || 1 })
+                      setBillItem({ ...billItem, quantity: parseInt(e.target.value, 10) || 0 })
                     }
                     min="1"
                     max={getAvailableStock()}
@@ -769,6 +870,317 @@ const MakeBill: React.FC<Props> = ({ companyId }) => {
             </div>
           </div>
         )}
+        </div>
+      )}
+
+      {showBillDetailsModal && (
+        <div className="modal-overlay" onClick={() => setShowBillDetailsModal(false)}>
+          <div className="modal bill-details-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="modal-title">Make New Bill - Editable Details</h2>
+              <button className="close-btn" onClick={() => setShowBillDetailsModal(false)}>
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <h3 className="section-title">Customer Details</h3>
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Customer Name *</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={customerDetails.name}
+                    onChange={(e) => setCustomerDetails({ ...customerDetails, name: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Phone Number *</label>
+                  <input
+                    type="tel"
+                    className="form-input"
+                    value={customerDetails.phone}
+                    onChange={(e) => setCustomerDetails({ ...customerDetails, phone: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Address</label>
+                <textarea
+                  className="form-input"
+                  rows={2}
+                  value={customerDetails.address}
+                  onChange={(e) => setCustomerDetails({ ...customerDetails, address: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">GST Number</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={customerDetails.gstNumber}
+                  onChange={(e) => setCustomerDetails({ ...customerDetails, gstNumber: e.target.value })}
+                />
+              </div>
+
+              <h3 className="section-title">Item & Tax Details</h3>
+              <div className="form-group">
+                <label className="form-label">Select Item</label>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setShowItemModal(true)}
+                  style={{ width: '100%' }}
+                >
+                  {billItem.model && billItem.type
+                    ? `${billItem.model} - ${billItem.type}`
+                    : '+ Select Item'}
+                </button>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Quantity *</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    value={billItem.quantity || ''}
+                    onChange={(e) =>
+                      setBillItem({ ...billItem, quantity: parseInt(e.target.value, 10) || 0 })
+                    }
+                    min="1"
+                    max={getAvailableStock()}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Rate (₹) *</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    value={billItem.rate || ''}
+                    onChange={(e) =>
+                      setBillItem({ ...billItem, rate: parseFloat(e.target.value) || 0 })
+                    }
+                    step="0.01"
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">CGST (%)</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    value={billItem.cgstPercent}
+                    onChange={(e) =>
+                      setBillItem({ ...billItem, cgstPercent: parseFloat(e.target.value) || 0 })
+                    }
+                    step="0.01"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">SGST (%)</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    value={billItem.sgstPercent}
+                    onChange={(e) =>
+                      setBillItem({ ...billItem, sgstPercent: parseFloat(e.target.value) || 0 })
+                    }
+                    step="0.01"
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Serial Numbers (Max 4)</label>
+                <div className="serial-grid">
+                  {billItem.serialNumbers.map((sn, index) => (
+                    <input
+                      key={index}
+                      type="text"
+                      className="form-input"
+                      value={sn}
+                      onChange={(e) => handleSerialNumberChange(index, e.target.value)}
+                      placeholder={`Serial #${index + 1}`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Round Off (₹)</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  value={roundOff}
+                  onChange={(e) => setRoundOff(parseFloat(e.target.value) || 0)}
+                  step="0.01"
+                />
+              </div>
+
+              <h3 className="section-title">Invoice Header & Transport Details</h3>
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Invoice Title</label>
+                  <input className="form-input" value={invoiceDetails.invoiceTitle} onChange={(e) => handleInvoiceDetailChange('invoiceTitle', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Copy Label</label>
+                  <input className="form-input" value={invoiceDetails.invoiceCopyLabel} onChange={(e) => handleInvoiceDetailChange('invoiceCopyLabel', e.target.value)} />
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Invoice Date</label>
+                  <input type="date" className="form-input" value={invoiceDetails.invoiceDate} onChange={(e) => handleInvoiceDetailChange('invoiceDate', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Delivery Note</label>
+                  <input className="form-input" value={invoiceDetails.deliveryNote} onChange={(e) => handleInvoiceDetailChange('deliveryNote', e.target.value)} />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Mode/Terms of Payment</label>
+                  <input className="form-input" value={invoiceDetails.modeTermsOfPayment} onChange={(e) => handleInvoiceDetailChange('modeTermsOfPayment', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Supplier's Ref.</label>
+                  <input className="form-input" value={invoiceDetails.suppliersRef} onChange={(e) => handleInvoiceDetailChange('suppliersRef', e.target.value)} />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Other Reference(s)</label>
+                  <input className="form-input" value={invoiceDetails.otherReferences} onChange={(e) => handleInvoiceDetailChange('otherReferences', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Buyer's Order No.</label>
+                  <input className="form-input" value={invoiceDetails.buyersOrderNo} onChange={(e) => handleInvoiceDetailChange('buyersOrderNo', e.target.value)} />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Buyer's Order Date</label>
+                  <input className="form-input" value={invoiceDetails.buyersOrderDate} onChange={(e) => handleInvoiceDetailChange('buyersOrderDate', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Despatched Document No.</label>
+                  <input className="form-input" value={invoiceDetails.dispatchDocNo} onChange={(e) => handleInvoiceDetailChange('dispatchDocNo', e.target.value)} />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Delivery Note Date</label>
+                  <input className="form-input" value={invoiceDetails.deliveryNoteDate} onChange={(e) => handleInvoiceDetailChange('deliveryNoteDate', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Despatched Through</label>
+                  <input className="form-input" value={invoiceDetails.dispatchedThrough} onChange={(e) => handleInvoiceDetailChange('dispatchedThrough', e.target.value)} />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Destination</label>
+                  <input className="form-input" value={invoiceDetails.destination} onChange={(e) => handleInvoiceDetailChange('destination', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Terms of Delivery</label>
+                  <input className="form-input" value={invoiceDetails.termsOfDelivery} onChange={(e) => handleInvoiceDetailChange('termsOfDelivery', e.target.value)} />
+                </div>
+              </div>
+
+              <h3 className="section-title">Goods/Bank/Declaration</h3>
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Buyer Heading</label>
+                  <input className="form-input" value={invoiceDetails.buyerHeading} onChange={(e) => handleInvoiceDetailChange('buyerHeading', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">HSN/SAC</label>
+                  <input className="form-input" value={invoiceDetails.hsnSac} onChange={(e) => handleInvoiceDetailChange('hsnSac', e.target.value)} />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">SF Column</label>
+                  <input className="form-input" value={invoiceDetails.sfCode} onChange={(e) => handleInvoiceDetailChange('sfCode', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Per Unit</label>
+                  <input className="form-input" value={invoiceDetails.perUnit} onChange={(e) => handleInvoiceDetailChange('perUnit', e.target.value)} />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Tax Label 1</label>
+                  <input className="form-input" value={invoiceDetails.outputCgstLabel} onChange={(e) => handleInvoiceDetailChange('outputCgstLabel', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Tax Label 2</label>
+                  <input className="form-input" value={invoiceDetails.outputSgstLabel} onChange={(e) => handleInvoiceDetailChange('outputSgstLabel', e.target.value)} />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Round Off Label</label>
+                <input className="form-input" value={invoiceDetails.roundOffLabel} onChange={(e) => handleInvoiceDetailChange('roundOffLabel', e.target.value)} />
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Bank Name</label>
+                  <input className="form-input" value={invoiceDetails.bankName} onChange={(e) => handleInvoiceDetailChange('bankName', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">A/c No.</label>
+                  <input className="form-input" value={invoiceDetails.accountNumber} onChange={(e) => handleInvoiceDetailChange('accountNumber', e.target.value)} />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Branch & IFSC</label>
+                <input className="form-input" value={invoiceDetails.branchIfsc} onChange={(e) => handleInvoiceDetailChange('branchIfsc', e.target.value)} />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Declaration Line 1</label>
+                <input className="form-input" value={invoiceDetails.declarationLine1} onChange={(e) => handleInvoiceDetailChange('declarationLine1', e.target.value)} />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Declaration Line 2</label>
+                <input className="form-input" value={invoiceDetails.declarationLine2} onChange={(e) => handleInvoiceDetailChange('declarationLine2', e.target.value)} />
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Jurisdiction Text</label>
+                  <input className="form-input" value={invoiceDetails.jurisdictionText} onChange={(e) => handleInvoiceDetailChange('jurisdictionText', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Computer Generated Text</label>
+                  <input className="form-input" value={invoiceDetails.computerGeneratedText} onChange={(e) => handleInvoiceDetailChange('computerGeneratedText', e.target.value)} />
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowBillDetailsModal(false)}>
+                Close
+              </button>
+              <button className="btn btn-success" onClick={handleSaveBill}>
+                Save Bill & Update Stock
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

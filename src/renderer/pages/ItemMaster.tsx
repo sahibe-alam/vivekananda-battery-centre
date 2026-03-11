@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ItemMaster } from '@shared/types';
 import './ItemMaster.css';
@@ -7,6 +7,8 @@ interface Props {
   companyId: string;
 }
 
+const NEW_MODEL_OPTION = '__new_model__';
+
 const ItemMasterPage: React.FC<Props> = ({ companyId }) => {
   const navigate = useNavigate();
   const [items, setItems] = useState<ItemMaster[]>([]);
@@ -14,11 +16,17 @@ const ItemMasterPage: React.FC<Props> = ({ companyId }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [formData, setFormData] = useState({
-    model: '',
     type: '',
     cgstPercent: 9,
     sgstPercent: 9,
   });
+  const [selectedModel, setSelectedModel] = useState('');
+  const [newModelName, setNewModelName] = useState('');
+
+  const existingModels = useMemo(
+    () => Array.from(new Set(items.map((item) => item.model))).sort(),
+    [items]
+  );
 
   useEffect(() => {
     loadItems();
@@ -37,7 +45,13 @@ const ItemMasterPage: React.FC<Props> = ({ companyId }) => {
   };
 
   const handleAddItem = async () => {
-    if (!formData.model.trim() || !formData.type.trim()) {
+    const shouldUseNewModel =
+      existingModels.length === 0 || selectedModel === NEW_MODEL_OPTION;
+    const modelToSave = shouldUseNewModel
+      ? newModelName.trim()
+      : selectedModel.trim();
+
+    if (!modelToSave || !formData.type.trim()) {
       alert('Please fill all fields');
       return;
     }
@@ -45,19 +59,47 @@ const ItemMasterPage: React.FC<Props> = ({ companyId }) => {
     try {
       await window.electronAPI.addItem({
         companyId,
-        model: formData.model.trim(),
+        model: modelToSave,
         type: formData.type.trim(),
         cgstPercent: formData.cgstPercent,
         sgstPercent: formData.sgstPercent,
       });
 
-      setFormData({ model: '', type: '', cgstPercent: 9, sgstPercent: 9 });
-      setShowAddModal(false);
+      closeAddModal();
       await loadItems();
     } catch (error) {
       console.error('Failed to add item:', error);
       alert('Failed to add item');
     }
+  };
+
+  const openAddModal = (initialItem?: Partial<ItemMaster>) => {
+    const initialModel = initialItem?.model?.trim() || '';
+    const hasInitialModel = initialModel.length > 0;
+    const isExistingModel = hasInitialModel && existingModels.includes(initialModel);
+
+    setFormData({
+      type: initialItem?.type || '',
+      cgstPercent: initialItem?.cgstPercent ?? 9,
+      sgstPercent: initialItem?.sgstPercent ?? 9,
+    });
+
+    if (hasInitialModel) {
+      setSelectedModel(isExistingModel ? initialModel : NEW_MODEL_OPTION);
+      setNewModelName(isExistingModel ? '' : initialModel);
+    } else {
+      setSelectedModel(existingModels[0] || NEW_MODEL_OPTION);
+      setNewModelName('');
+    }
+
+    setShowAddModal(true);
+  };
+
+  const closeAddModal = () => {
+    setShowAddModal(false);
+    setFormData({ type: '', cgstPercent: 9, sgstPercent: 9 });
+    setSelectedModel('');
+    setNewModelName('');
   };
 
   const handleEdit = (item: ItemMaster) => {
@@ -114,7 +156,7 @@ const ItemMasterPage: React.FC<Props> = ({ companyId }) => {
         <div className="page-actions">
           <button
             className="btn btn-primary"
-            onClick={() => setShowAddModal(true)}
+            onClick={openAddModal}
           >
             + Add Item
           </button>
@@ -146,7 +188,7 @@ const ItemMasterPage: React.FC<Props> = ({ companyId }) => {
                 {items.map((item) => (
                   <tr
                     key={item.id}
-                    onDoubleClick={() => handleEdit(item)}
+                    onDoubleClick={() => openAddModal(item)}
                     className={editingId === item.id ? 'editing' : ''}
                   >
                     <td>
@@ -260,13 +302,13 @@ const ItemMasterPage: React.FC<Props> = ({ companyId }) => {
       </div>
 
       {showAddModal && (
-        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+        <div className="modal-overlay" onClick={closeAddModal}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="modal-title">Add New Item</h2>
               <button
                 className="close-btn"
-                onClick={() => setShowAddModal(false)}
+                onClick={closeAddModal}
               >
                 ×
               </button>
@@ -274,15 +316,39 @@ const ItemMasterPage: React.FC<Props> = ({ companyId }) => {
             <div className="modal-body">
               <div className="form-group">
                 <label className="form-label">Model</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={formData.model}
-                  onChange={(e) =>
-                    setFormData({ ...formData, model: e.target.value })
-                  }
-                  placeholder="e.g., SF Sonic"
-                />
+                {existingModels.length > 0 ? (
+                  <>
+                    <select
+                      className="form-input"
+                      value={selectedModel}
+                      onChange={(e) => setSelectedModel(e.target.value)}
+                    >
+                      {existingModels.map((model) => (
+                        <option key={model} value={model}>
+                          {model}
+                        </option>
+                      ))}
+                      <option value={NEW_MODEL_OPTION}>Add New Model</option>
+                    </select>
+                    {selectedModel === NEW_MODEL_OPTION && (
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={newModelName}
+                        onChange={(e) => setNewModelName(e.target.value)}
+                        placeholder="Enter new model name"
+                      />
+                    )}
+                  </>
+                ) : (
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={newModelName}
+                    onChange={(e) => setNewModelName(e.target.value)}
+                    placeholder="Enter new model name"
+                  />
+                )}
               </div>
               <div className="form-group">
                 <label className="form-label">Type</label>
@@ -332,7 +398,7 @@ const ItemMasterPage: React.FC<Props> = ({ companyId }) => {
             <div className="modal-footer">
               <button
                 className="btn btn-secondary"
-                onClick={() => setShowAddModal(false)}
+                onClick={closeAddModal}
               >
                 Cancel
               </button>

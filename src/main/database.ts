@@ -4,6 +4,7 @@ import path from 'path';
 import {
   Company,
   Profile,
+  BankDetail,
   ItemMaster,
   Purchase,
   Sale,
@@ -43,9 +44,20 @@ export class DatabaseService {
         phone TEXT NOT NULL,
         gstNumber TEXT NOT NULL,
         pan TEXT NOT NULL,
-        email TEXT NOT NULL
+        email TEXT NOT NULL,
+        bankDetails TEXT NOT NULL DEFAULT '[]'
       )
     `);
+
+    const profileColumns = this.db
+      .prepare(`PRAGMA table_info(profile)`)
+      .all() as Array<{ name: string }>;
+
+    if (!profileColumns.some((column) => column.name === 'bankDetails')) {
+      this.db.exec(
+        `ALTER TABLE profile ADD COLUMN bankDetails TEXT NOT NULL DEFAULT '[]'`
+      );
+    }
 
     // Item Master table
     this.db.exec(`
@@ -165,15 +177,55 @@ export class DatabaseService {
   // Profile operations
   getProfile(): Profile | null {
     const stmt = this.db.prepare('SELECT * FROM profile WHERE id = 1');
-    const result = stmt.get() as Profile | undefined;
-    return result || null;
+    const result = stmt.get() as
+      | (Omit<Profile, 'bankDetail'> & { bankDetails?: string })
+      | undefined;
+
+    if (!result) {
+      return null;
+    }
+
+    let bankDetail: BankDetail = {
+      bankName: '',
+      accountNumber: '',
+      branch: '',
+      ifscCode: '',
+    };
+
+    if (result.bankDetails) {
+      try {
+        const parsed = JSON.parse(result.bankDetails) as BankDetail[] | BankDetail;
+        if (Array.isArray(parsed)) {
+          bankDetail = parsed[0] || bankDetail;
+        } else if (parsed && typeof parsed === 'object') {
+          bankDetail = parsed;
+        }
+      } catch {
+        bankDetail = {
+          bankName: '',
+          accountNumber: '',
+          branch: '',
+          ifscCode: '',
+        };
+      }
+    }
+
+    return {
+      businessName: result.businessName,
+      address: result.address,
+      phone: result.phone,
+      gstNumber: result.gstNumber,
+      pan: result.pan,
+      email: result.email,
+      bankDetail,
+    };
   }
 
   updateProfile(profile: Profile): void {
     const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO profile 
-      (id, businessName, address, phone, gstNumber, pan, email) 
-      VALUES (1, ?, ?, ?, ?, ?, ?)
+      (id, businessName, address, phone, gstNumber, pan, email, bankDetails) 
+      VALUES (1, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
       profile.businessName,
@@ -181,7 +233,8 @@ export class DatabaseService {
       profile.phone,
       profile.gstNumber,
       profile.pan,
-      profile.email
+      profile.email,
+      JSON.stringify(profile.bankDetail)
     );
   }
 

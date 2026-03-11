@@ -8,8 +8,10 @@ let mainWindow: BrowserWindow | null = null;
 let database: DatabaseService | null = null;
 
 function createWindow(): void {
+  const isDev = process.env.NODE_ENV === 'development' && !app.isPackaged;
+
   // Determine preload path based on environment
-  const preloadPath = process.env.NODE_ENV === 'development'
+  const preloadPath = isDev
     ? path.join(app.getAppPath(), 'dist/preload/preload/preload.js')
     : path.join(__dirname, '../../preload/preload/preload.js');
 
@@ -22,6 +24,7 @@ function createWindow(): void {
     height: 900,
     minWidth: 1200,
     minHeight: 700,
+    autoHideMenuBar: true,
     webPreferences: {
       preload: preloadPath,
       nodeIntegration: false,
@@ -32,7 +35,7 @@ function createWindow(): void {
   });
 
   // Load the app
-  if (process.env.NODE_ENV === 'development') {
+  if (isDev) {
     // Wait a bit for Vite server to start, then load
     setTimeout(() => {
       mainWindow?.loadURL('http://localhost:5173').catch(() => {
@@ -60,13 +63,10 @@ function createWindow(): void {
 
   mainWindow.on('unresponsive', () => console.error('Main window unresponsive'));
 
-  // Open DevTools in production builds to inspect issues when running file://
-  if (process.env.NODE_ENV !== 'development') {
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
-  }
-
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show();
+    mainWindow?.focus();
+    mainWindow?.webContents.focus();
   });
 
   mainWindow.on('closed', () => {
@@ -138,6 +138,10 @@ app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
     }
+  });
+
+  app.on('browser-window-focus', (_event, window) => {
+    window.webContents.focus();
   });
 });
 

@@ -1,19 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Profile } from '@shared/types';
+import { Profile, BankDetail } from '@shared/types';
 import './MyProfile.css';
+
+const EMPTY_BANK_DETAIL: BankDetail = {
+  bankName: '',
+  accountNumber: '',
+  branch: '',
+  ifscCode: '',
+};
+
+const INITIAL_PROFILE: Profile = {
+  businessName: '',
+  address: '',
+  phone: '',
+  gstNumber: '',
+  pan: '',
+  email: '',
+  bankDetail: { ...EMPTY_BANK_DETAIL },
+};
 
 const MyProfile: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [formData, setFormData] = useState<Profile>({
-    businessName: '',
-    address: '',
-    phone: '',
-    gstNumber: '',
-    pan: '',
-    email: '',
-  });
+  const [formData, setFormData] = useState<Profile>(INITIAL_PROFILE);
 
   useEffect(() => {
     loadProfile();
@@ -23,7 +33,10 @@ const MyProfile: React.FC = () => {
     try {
       const profile = await window.electronAPI.getProfile();
       if (profile) {
-        setFormData(profile);
+        setFormData({
+          ...profile,
+          bankDetail: profile.bankDetail || { ...EMPTY_BANK_DETAIL },
+        });
       }
     } catch (error) {
       console.error('Failed to load profile:', error);
@@ -47,6 +60,16 @@ const MyProfile: React.FC = () => {
       console.error('Failed to update profile:', error);
       alert('Failed to update profile');
     }
+  };
+
+  const handleBankDetailChange = (field: keyof BankDetail, value: string) => {
+    setFormData({
+      ...formData,
+      bankDetail: {
+        ...formData.bankDetail,
+        [field]: value,
+      },
+    });
   };
 
   if (loading) {
@@ -139,6 +162,61 @@ const MyProfile: React.FC = () => {
                   }
                   placeholder="e.g., AAAAA0000A"
                 />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Bank Details</label>
+              <div className="bank-detail-card">
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Bank Name</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={formData.bankDetail.bankName}
+                      onChange={(e) =>
+                        handleBankDetailChange('bankName', e.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Account Number</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={formData.bankDetail.accountNumber}
+                      onChange={(e) =>
+                        handleBankDetailChange('accountNumber', e.target.value)
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Branch</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={formData.bankDetail.branch}
+                      onChange={(e) =>
+                        handleBankDetailChange('branch', e.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">IFSC Code</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={formData.bankDetail.ifscCode}
+                      onChange={(e) =>
+                        handleBankDetailChange('ifscCode', e.target.value)
+                      }
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 

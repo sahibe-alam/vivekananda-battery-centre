@@ -81,6 +81,13 @@ const StockManagement: React.FC<Props> = ({ companyId }) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     let yPos = 15;
+    const primaryBank = profile?.bankDetail;
+    const bankName = primaryBank?.bankName?.trim() || 'BANK OF INDIA';
+    const accountNumber = primaryBank?.accountNumber?.trim() || '428120110000218';
+    const branchAndIfsc =
+      `${primaryBank?.branch?.trim() || 'BALLY BAZAR'} & ${
+        primaryBank?.ifscCode?.trim() || 'BKID0004281'
+      }`;
 
     // Header - Dynamic from Profile
     doc.setFontSize(14);
@@ -273,15 +280,15 @@ const StockManagement: React.FC<Props> = ({ companyId }) => {
     doc.text("Company's Bank Details:", col1X + 2, yPos + 4);
     doc.text('Bank Name:', col1X + 2, yPos + 8);
     doc.setFont('helvetica', 'bold');
-    doc.text('BANK OF INDIA', col1X + 25, yPos + 8);
+    doc.text(bankName, col1X + 25, yPos + 8);
     doc.setFont('helvetica', 'normal');
     doc.text('A/c No.:', col1X + 2, yPos + 12);
     doc.setFont('helvetica', 'bold');
-    doc.text('428120110000218', col1X + 25, yPos + 12);
+    doc.text(accountNumber, col1X + 25, yPos + 12);
     doc.setFont('helvetica', 'normal');
     doc.text('Branch & IFS Code :', col1X + 2, yPos + 16);
     doc.setFont('helvetica', 'bold');
-    doc.text('BALLY BAZAR & BKID0004281', col1X + 25, yPos + 16);
+    doc.text(branchAndIfsc, col1X + 25, yPos + 16);
     
     doc.rect(col1X + 120, yPos, 60, 20);
     doc.setFontSize(8);

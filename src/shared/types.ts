@@ -6,6 +6,13 @@ export interface Company {
   createdAt: string;
 }
 
+export interface BankDetail {
+  bankName: string;
+  accountNumber: string;
+  branch: string;
+  ifscCode: string;
+}
+
 export interface Profile {
   businessName: string;
   address: string;
@@ -13,6 +20,7 @@ export interface Profile {
   gstNumber: string;
   pan: string;
   email: string;
+  bankDetail: BankDetail;
 }
 
 export interface ItemMaster {
