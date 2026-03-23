@@ -188,18 +188,21 @@ const MakeBill: React.FC<Props> = ({ companyId }) => {
   };
 
   const calculateAmounts = () => {
-    const subtotal = billItem.rate * billItem.quantity;
-    const cgstAmount = (subtotal * billItem.cgstPercent) / 100;
-    const sgstAmount = (subtotal * billItem.sgstPercent) / 100;
-    const totalBeforeRound = subtotal + cgstAmount + sgstAmount;
-    const total = totalBeforeRound + roundOff;
-
+    // GST-inclusive calculation
+    const total = billItem.rate * billItem.quantity;
+    const totalGstPercent = billItem.cgstPercent + billItem.sgstPercent;
+    const gstFraction = totalGstPercent / (100 + totalGstPercent);
+    const totalGst = total * gstFraction;
+    const cgstAmount = totalGst * (billItem.cgstPercent / totalGstPercent);
+    const sgstAmount = totalGst * (billItem.sgstPercent / totalGstPercent);
+    const subtotal = total - totalGst;
+    const totalWithRound = total + roundOff;
     return {
       subtotal: subtotal.toFixed(2),
       cgstAmount: cgstAmount.toFixed(2),
       sgstAmount: sgstAmount.toFixed(2),
-      totalGst: (cgstAmount + sgstAmount).toFixed(2),
-      total: total.toFixed(2),
+      totalGst: totalGst.toFixed(2),
+      total: totalWithRound.toFixed(2),
     };
   };
 
@@ -865,7 +868,7 @@ const MakeBill: React.FC<Props> = ({ companyId }) => {
             )}
 
             <div className="summary-row total">
-              <span>Total Amount:</span>
+              <span>Total Amount (incl. GST):</span>
               <span>₹ {amounts.total}</span>
             </div>
           </div>
